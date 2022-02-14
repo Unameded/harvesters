@@ -31,7 +31,7 @@ import unittest
 from urllib.parse import quote
 
 # Related third party imports
-from genicam.genapi import RuntimeException
+from genicam.genapi import RuntimeException, InvalidArgumentException
 from genicam.gentl import TimeoutException
 import numpy as np
 
@@ -782,6 +782,23 @@ class TestHarvesterCore(TestHarvester):
         with self.assertRaises(RuntimeException):
             _ = self.harvester.create_image_acquirer(
                 0, file_dict={r'\.xml$': bytes('<', encoding='utf-8')})
+
+    def test_issue_275(self):
+        self.ia = self.harvester.create_image_acquirer(0)  # type: ImageAcquirer
+        value = 'NewestOnly'
+        if self.is_running_with_default_target():
+            with self.assertRaises(InvalidArgumentException):
+                self.ia.buffer_handling_mode = value
+        else:
+            try:
+                self.ia.buffer_handling_mode = value
+            except:
+                pass
+            else:
+                self.ia.start_acquisition()
+                with self.ia.fetch_buffer() as buffer:
+                    self._logger.info('{0}'.format(buffer))
+                self.ia.stop_acquisition()
 
 
 class _TestIssue81(threading.Thread):

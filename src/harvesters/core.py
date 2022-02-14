@@ -1740,6 +1740,11 @@ class ImageAcquirer:
 
     @buffer_handling_mode.setter
     def buffer_handling_mode(self, value):
+        for ds in self.data_streams:
+            try:
+                ds.node_map.StreamBufferHandlingMode.value = value
+            except:
+                raise
         self._buffer_handling_mode = value
 
     @property
@@ -2241,18 +2246,22 @@ class ImageAcquirer:
 
                             if queue.full():
                                 _buffer = queue.get()
-
-                                if _is_logging_buffer_manipulation:
-                                    _logger.debug(
-                                        '{} has queued buffer {} to data stream {}'.format(
-                                            self, _buffer.context,
-                                            _family_tree(_buffer.parent)))
-
                                 _buffer.parent.queue_buffer(_buffer)
 
                             _buffer = event_manager.buffer
                             queue.put(_buffer)
                             self._update_statistics(_buffer)
+                    elif self.buffer_handling_mode == 'NewestOnly':
+                        with MutexLocker(self.thread_image_acquisition):
+                            if not self._is_acquiring:
+                                return
+
+                            if not queue.empty():
+                                _buffer = queue.get()
+                                _buffer.parent.queue_buffer(_buffer)
+
+                            _buffer = event_manager.buffer
+                            queue.put(_buffer)
                     else:
                         _buffer = event_manager.buffer
                         self._update_statistics(_buffer)
